@@ -1,0 +1,69 @@
+Table users {
+  id int [pk, increment]
+  name varchar(100) [not null]
+  email varchar(150) [not null, unique]
+  password_hash varchar(255) [not null]
+  role varchar(20) [not null, default: 'USER']
+  created_at datetime
+  updated_at datetime
+}
+
+Table contents {
+  id int [pk, increment]
+  title varchar(200) [not null]
+  content_type varchar(20) [not null]
+  description text
+  release_date date
+  duration_minutes int
+  poster_url varchar(500)
+  created_at datetime
+  updated_at datetime
+}
+
+Table genres {
+  id int [pk, increment]
+  name varchar(100) [not null, unique]
+}
+
+Table content_genres {
+  content_id int [pk]
+  genre_id int [pk]
+}
+
+Table ratings {
+  id int [pk, increment]
+  user_id int [not null]
+  content_id int [not null]
+  rating decimal(2,1) [not null]
+  created_at datetime
+  updated_at datetime
+}
+
+Table reviews {
+  id int [pk, increment]
+  user_id int [not null]
+  content_id int [not null]
+  review_text text [not null]
+  status varchar(20) [not null, default: 'ACTIVE']
+  created_at datetime
+  updated_at datetime
+}
+
+Table watchlists {
+  id int [pk, increment]
+  user_id int [not null]
+  content_id int [not null]
+  created_at datetime
+}
+
+Ref: content_genres.content_id > contents.id
+Ref: content_genres.genre_id > genres.id
+
+Ref: ratings.user_id > users.id
+Ref: ratings.content_id > contents.id
+
+Ref: reviews.user_id > users.id
+Ref: reviews.content_id > contents.id
+
+Ref: watchlists.user_id > users.id
+Ref: watchlists.content_id > contents.id
