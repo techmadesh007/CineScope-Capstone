@@ -4,6 +4,19 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from jose import jwt
 from passlib.context import CryptContext
+from jose import JWTError
+
+
+def decode_access_token(token: str):
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+        return payload
+    except JWTError:
+        return None
 
 load_dotenv()
 
@@ -38,4 +51,8 @@ def create_access_token(user_id: int, role: str) -> str:
         "exp": expire
     }
 
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(
+        payload,
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
