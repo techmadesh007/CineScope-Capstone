@@ -1,226 +1,214 @@
 import { useEffect, useState } from "react";
 import api from "./api";
-import "./index.css";
 
 function App() {
   const [contents, setContents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState("login");
-
-  const [name, setName] = useState("");
+  const [showLogin, setShowLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const [authMessage, setAuthMessage] = useState("");
-  const [authError, setAuthError] = useState("");
-
-  const [token, setToken] = useState(
-    localStorage.getItem("access_token")
-  );
-
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
-
-    if (savedUser) {
-      try {
-        return JSON.parse(savedUser);
-      } catch {
-        return null;
-      }
-    }
-
-    return null;
-  });
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [user, setUser] = useState(null);
 
   const [selectedContent, setSelectedContent] = useState(null);
-
-  const [rating, setRating] = useState(0);
-  const [reviewText, setReviewText] = useState("");
 
   const [ratings, setRatings] = useState([]);
   const [reviews, setReviews] = useState([]);
 
+  const [selectedRating, setSelectedRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [ratingLoading, setRatingLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewMessage, setReviewMessage] = useState("");
-  const [reviewError, setReviewError] = useState("");
+
+  const [detailsError, setDetailsError] = useState("");
 
   useEffect(() => {
     loadContents();
+
+    const savedUser = localStorage.getItem("cinescope_user");
+
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem("cinescope_user");
+      }
+    }
   }, []);
 
   async function loadContents() {
     try {
-      const response = await api.get("/content");
+      setLoading(true);
+      setError("");
+
+      const response = await api.get("/api/content");
+
       setContents(response.data);
     } catch (err) {
+      console.error("Content loading error:", err);
+
       setError("Unable to load movies and webseries.");
-      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
-  function openLogin() {
-    setAuthMode("login");
-    setShowAuth(true);
-    setAuthMessage("");
-    setAuthError("");
-    setName("");
-    setEmail("");
-    setPassword("");
-  }
+  function scrollToMovies() {
+    const section = document.getElementById("movies");
 
-  function openRegister() {
-    setAuthMode("register");
-    setShowAuth(true);
-    setAuthMessage("");
-    setAuthError("");
-    setName("");
-    setEmail("");
-    setPassword("");
-  }
-
-  function closeAuth() {
-    setShowAuth(false);
-    setAuthMessage("");
-    setAuthError("");
-  }
-
-  async function handleAuth(event) {
-    event.preventDefault();
-
-    setAuthMessage("");
-    setAuthError("");
-
-    try {
-      if (authMode === "register") {
-        const response = await api.post(
-          "/auth/register",
-          {
-            name,
-            email,
-            password,
-          }
-        );
-
-        setAuthMessage(
-          response.data?.message ||
-            "Registration successful. Please login."
-        );
-
-        setAuthMode("login");
-        setName("");
-        setPassword("");
-
-        return;
-      }
-
-      const response = await api.post(
-        "/auth/login",
-        {
-          email,
-          password,
-        }
-      );
-
-      const accessToken =
-        response.data.access_token;
-
-      localStorage.setItem(
-        "access_token",
-        accessToken
-      );
-
-      setToken(accessToken);
-
-      if (response.data.user) {
-        localStorage.setItem(
-          "user",
-          JSON.stringify(response.data.user)
-        );
-
-        setUser(response.data.user);
-      }
-
-      setAuthMessage("Login successful!");
-
-      setTimeout(() => {
-        setShowAuth(false);
-        setAuthMessage("");
-      }, 700);
-    } catch (err) {
-      console.error("AUTH ERROR:", err);
-
-      const detail =
-        err.response?.data?.detail;
-
-      if (typeof detail === "string") {
-        setAuthError(detail);
-      } else {
-        setAuthError(
-          authMode === "login"
-            ? "Invalid email or password."
-            : "Registration failed."
-        );
-      }
+    if (section) {
+      section.scrollIntoView({
+        behavior: "smooth",
+      });
     }
   }
 
-  function logout() {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
-
-    setToken(null);
-    setUser(null);
-
-    setSelectedContent(null);
-    setRating(0);
-    setReviewText("");
+  function openLogin() {
+    setLoginError("");
+    setEmail("");
+    setPassword("");
+    setShowLogin(true);
   }
 
-  async function openReviewPanel(content) {
+  function closeLogin() {
+    if (!loginLoading) {
+      setShowLogin(false);
+      setLoginError("");
+    }
+  }
+
+  async function handleLogin(event) {
+    event.preventDefault();
+
+    setLoginError("");
+
+    if (!email.trim() || !password.trim()) {
+      setLoginError("Please enter your email and password.");
+      return;
+    }
+
+    try {
+      setLoginLoading(true);
+
+      const response = await api.post("/api/auth/login", {
+        email: email.trim(),
+        password: password,
+      });
+
+      const data = response.data;
+
+      if (data.access_token) {
+        localStorage.setItem(
+          "cinescope_token",
+          data.access_token
+        );
+      }
+
+      const loggedInUser = {
+        email: email.trim(),
+        ...data,
+      };
+
+      localStorage.setItem(
+        "cinescope_user",
+        JSON.stringify(loggedInUser)
+      );
+
+      setUser(loggedInUser);
+
+      setShowLogin(false);
+      setEmail("");
+      setPassword("");
+      setLoginError("");
+
+      alert("Login successful!");
+    } catch (err) {
+      console.error("Login error:", err);
+
+      if (err.response) {
+        if (err.response.status === 401) {
+          setLoginError("Invalid email or password.");
+        } else if (err.response.data?.detail) {
+          setLoginError(err.response.data.detail);
+        } else {
+          setLoginError("Login failed. Please try again.");
+        }
+      } else {
+        setLoginError("Unable to connect to the server.");
+      }
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("cinescope_token");
+    localStorage.removeItem("cinescope_user");
+
+    setUser(null);
+
+    alert("Logged out successfully.");
+  }
+
+  async function openContent(content) {
     setSelectedContent(content);
-    setRating(0);
+    setRatings([]);
+    setReviews([]);
     setReviewText("");
-    setReviewMessage("");
-    setReviewError("");
+    setSelectedRating(5);
+    setDetailsError("");
+    setDetailsLoading(true);
 
     try {
       const [ratingsResponse, reviewsResponse] =
         await Promise.all([
-          api.get(`/ratings/${content.id}`),
-          api.get(`/reviews/${content.id}`),
+          api.get(`/api/ratings/${content.id}`),
+          api.get(`/api/reviews/${content.id}`),
         ]);
 
       setRatings(ratingsResponse.data);
       setReviews(reviewsResponse.data);
     } catch (err) {
-      console.error(
-        "Unable to load ratings/reviews:",
-        err
-      );
+      console.error("Details loading error:", err);
 
-      setRatings([]);
-      setReviews([]);
+      setDetailsError(
+        "Unable to load ratings or reviews."
+      );
+    } finally {
+      setDetailsLoading(false);
     }
   }
 
-  function closeReviewPanel() {
+  function closeContent() {
     setSelectedContent(null);
-    setRating(0);
-    setReviewText("");
     setRatings([]);
     setReviews([]);
-    setReviewMessage("");
-    setReviewError("");
+    setReviewText("");
+    setDetailsError("");
+  }
+
+  function calculateAverageRating() {
+    if (ratings.length === 0) {
+      return "No ratings";
+    }
+
+    const total = ratings.reduce(
+      (sum, item) => sum + Number(item.rating),
+      0
+    );
+
+    return (total / ratings.length).toFixed(1);
   }
 
   async function submitRating() {
-    if (!token) {
-      setReviewError("Please login to give a rating.");
+    if (!user) {
+      closeContent();
       openLogin();
       return;
     }
@@ -229,20 +217,18 @@ function App() {
       return;
     }
 
-    if (rating < 1 || rating > 5) {
-      setReviewError("Please select a rating from 1 to 5.");
-      return;
-    }
-
-    setReviewMessage("");
-    setReviewError("");
-
     try {
-      await api.post(
-        "/ratings",
+      setRatingLoading(true);
+
+      const token = localStorage.getItem(
+        "cinescope_token"
+      );
+
+      const response = await api.post(
+        "/api/ratings",
         {
           content_id: selectedContent.id,
-          rating: Number(rating),
+          rating: Number(selectedRating),
         },
         {
           headers: {
@@ -251,34 +237,44 @@ function App() {
         }
       );
 
-      setReviewMessage("Rating submitted successfully.");
+      setRatings((current) => {
+        const existing = current.find(
+          (item) => item.user_id === response.data.user_id
+        );
 
-      const response = await api.get(
-        `/ratings/${selectedContent.id}`
-      );
+        if (existing) {
+          return current.map((item) =>
+            item.id === existing.id
+              ? response.data
+              : item
+          );
+        }
 
-      setRatings(response.data);
+        return [...current, response.data];
+      });
+
+      alert("Rating submitted successfully!");
     } catch (err) {
-      console.error("RATING ERROR:", err);
+      console.error("Rating error:", err);
 
       if (err.response?.status === 401) {
-        setReviewError(
-          "Your login session has expired. Please login again."
-        );
+        alert("Please login again.");
+        handleLogout();
+      } else if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
       } else {
-        setReviewError(
-          err.response?.data?.detail ||
-            "Unable to submit rating."
-        );
+        alert("Unable to submit rating.");
       }
+    } finally {
+      setRatingLoading(false);
     }
   }
 
   async function submitReview(event) {
     event.preventDefault();
 
-    if (!token) {
-      setReviewError("Please login to write a review.");
+    if (!user) {
+      closeContent();
       openLogin();
       return;
     }
@@ -288,17 +284,19 @@ function App() {
     }
 
     if (!reviewText.trim()) {
-      setReviewError("Please write a review.");
+      alert("Please write a review.");
       return;
     }
 
-    setReviewLoading(true);
-    setReviewMessage("");
-    setReviewError("");
-
     try {
-      await api.post(
-        "/reviews",
+      setReviewLoading(true);
+
+      const token = localStorage.getItem(
+        "cinescope_token"
+      );
+
+      const response = await api.post(
+        "/api/reviews",
         {
           content_id: selectedContent.id,
           review_text: reviewText.trim(),
@@ -310,50 +308,34 @@ function App() {
         }
       );
 
-      setReviewMessage("Review submitted successfully.");
+      setReviews((current) => [
+        response.data,
+        ...current,
+      ]);
+
       setReviewText("");
 
-      const response = await api.get(
-        `/reviews/${selectedContent.id}`
-      );
-
-      setReviews(response.data);
+      alert("Review submitted successfully!");
     } catch (err) {
-      console.error("REVIEW ERROR:", err);
+      console.error("Review error:", err);
 
       if (err.response?.status === 401) {
-        setReviewError(
-          "Your login session has expired. Please login again."
-        );
+        alert("Please login again.");
+        handleLogout();
+      } else if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
       } else {
-        setReviewError(
-          err.response?.data?.detail ||
-            "Unable to submit review."
-        );
+        alert("Unable to submit review.");
       }
     } finally {
       setReviewLoading(false);
     }
   }
 
-  function calculateAverageRating() {
-    if (ratings.length === 0) {
-      return "No ratings yet";
-    }
-
-    const total = ratings.reduce(
-      (sum, item) =>
-        sum + Number(item.rating),
-      0
-    );
-
-    return (
-      total / ratings.length
-    ).toFixed(1);
-  }
-
   return (
     <div className="app">
+
+      {/* NAVBAR */}
 
       <header className="navbar">
         <div className="logo">
@@ -373,40 +355,41 @@ function App() {
             Webseries
           </a>
 
-          {token ? (
+          {user ? (
             <>
-              <span className="welcome-user">
-                {user?.name || "User"}
+              <span
+                style={{
+                  color: "#aaaab3",
+                  fontSize: "14px",
+                }}
+              >
+                {user.email}
               </span>
 
               <button
                 className="login-button"
-                onClick={logout}
+                onClick={handleLogout}
               >
                 Logout
               </button>
             </>
           ) : (
-            <>
-              <button
-                className="login-button"
-                onClick={openLogin}
-              >
-                Login
-              </button>
-
-              <button
-                className="register-button"
-                onClick={openRegister}
-              >
-                Register
-              </button>
-            </>
+            <button
+              className="login-button"
+              onClick={openLogin}
+            >
+              Login
+            </button>
           )}
         </nav>
       </header>
 
+
+      {/* MAIN */}
+
       <main>
+
+        {/* HERO */}
 
         <section
           className="hero"
@@ -425,26 +408,23 @@ function App() {
             </h1>
 
             <p className="hero-description">
-              Explore movies and webseries,
-              share your ratings, and discover
-              what other viewers think.
+              Explore movies and webseries, share
+              your ratings, and discover what other
+              viewers think.
             </p>
 
             <button
               className="primary-button"
-              onClick={() =>
-                document
-                  .getElementById("movies")
-                  .scrollIntoView({
-                    behavior: "smooth",
-                  })
-              }
+              onClick={scrollToMovies}
             >
               Explore Content
             </button>
 
           </div>
         </section>
+
+
+        {/* CONTENT */}
 
         <section
           className="content-section"
@@ -469,102 +449,141 @@ function App() {
 
           </div>
 
+
+          {/* LOADING */}
+
           {loading && (
             <div className="message">
               Loading content...
             </div>
           )}
 
-          {error && (
+
+          {/* ERROR */}
+
+          {!loading && error && (
             <div className="message error">
               {error}
+
+              <button
+                className="retry-button"
+                onClick={loadContents}
+              >
+                Retry
+              </button>
             </div>
           )}
+
+
+          {/* EMPTY */}
 
           {!loading &&
             !error &&
             contents.length === 0 && (
               <div className="message">
-                No movies or webseries
-                available yet.
+                No movies or webseries available yet.
               </div>
             )}
+
+
+          {/* CONTENT CARDS */}
 
           {!loading &&
             !error &&
             contents.length > 0 && (
 
-            <div className="content-grid">
+              <div className="content-grid">
 
-              {contents.map((content) => (
+                {contents.map((content) => (
 
-                <article
-                  className="content-card"
-                  key={content.id}
-                >
+                  <article
+                    className="content-card"
+                    key={content.id}
+                    onClick={() => openContent(content)}
+                    style={{
+                      cursor: "pointer",
+                    }}
+                  >
 
-                  <div className="poster">
+                    <div className="poster">
 
-                    {content.poster_url ? (
+                      {content.poster_url ? (
 
-                      <img
-                        src={content.poster_url}
-                        alt={content.title}
-                      />
+                        <img
+                          src={content.poster_url}
+                          alt={content.title}
+                          onError={(event) => {
+                            event.currentTarget.style.display =
+                              "none";
+                          }}
+                        />
 
-                    ) : (
+                      ) : (
 
-                      <div className="poster-placeholder">
+                        <div className="poster-placeholder">
+                          {content.content_type}
+                        </div>
+
+                      )}
+
+                    </div>
+
+
+                    <div className="card-content">
+
+                      <span className="content-type">
                         {content.content_type}
+                      </span>
+
+                      <h3>
+                        {content.title}
+                      </h3>
+
+                      <p>
+                        {content.description ||
+                          "No description available."}
+                      </p>
+
+                      {content.release_date && (
+                        <span className="release-date">
+                          Release:{" "}
+                          {content.release_date}
+                        </span>
+                      )}
+
+                      {content.duration_minutes && (
+                        <span className="release-date">
+                          Duration:{" "}
+                          {content.duration_minutes} minutes
+                        </span>
+                      )}
+
+                      <div
+                        style={{
+                          marginTop: "15px",
+                          color: "#ffffff",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                        }}
+                      >
+                        View details →
                       </div>
 
-                    )}
+                    </div>
 
-                  </div>
+                  </article>
 
-                  <div className="card-content">
+                ))}
 
-                    <span className="content-type">
-                      {content.content_type}
-                    </span>
-
-                    <h3>
-                      {content.title}
-                    </h3>
-
-                    <p>
-                      {content.description ||
-                        "No description available."}
-                    </p>
-
-                    {content.release_date && (
-                      <span className="release-date">
-                        {content.release_date}
-                      </span>
-                    )}
-
-                    <button
-                      className="review-button"
-                      onClick={() =>
-                        openReviewPanel(content)
-                      }
-                    >
-                      Rate & Review
-                    </button>
-
-                  </div>
-
-                </article>
-
-              ))}
-
-            </div>
-
-          )}
+              </div>
+            )}
 
         </section>
 
       </main>
+
+
+      {/* FOOTER */}
 
       <footer>
         <p>
@@ -573,344 +592,581 @@ function App() {
         </p>
       </footer>
 
-      {showAuth && (
+
+      {/* LOGIN MODAL */}
+
+      {showLogin && (
 
         <div
-          className="auth-overlay"
-          onClick={closeAuth}
+          className="login-overlay"
+          onClick={(event) => {
+            if (
+              event.target === event.currentTarget
+            ) {
+              closeLogin();
+            }
+          }}
         >
 
-          <div
-            className="auth-modal"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
+          <div className="login-modal">
 
             <button
-              className="close-button"
-              onClick={closeAuth}
+              className="login-close"
+              onClick={closeLogin}
+              disabled={loginLoading}
             >
               ×
             </button>
 
-            <div className="auth-header">
-
-              <p className="section-label">
-                CINE SCOPE
-              </p>
-
-              <h2>
-                {authMode === "login"
-                  ? "Welcome Back"
-                  : "Create Account"}
-              </h2>
-
-              <p>
-                {authMode === "login"
-                  ? "Login to continue."
-                  : "Join CineScope and start reviewing."}
-              </p>
-
+            <div className="login-brand">
+              CINESCOPE
             </div>
-
-            <form
-              className="auth-form"
-              onSubmit={handleAuth}
-            >
-
-              {authMode === "register" && (
-
-                <div className="form-group">
-
-                  <label>
-                    Name
-                  </label>
-
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(event) =>
-                      setName(event.target.value)
-                    }
-                    placeholder="Enter your name"
-                    required
-                  />
-
-                </div>
-
-              )}
-
-              <div className="form-group">
-
-                <label>
-                  Email
-                </label>
-
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) =>
-                    setEmail(event.target.value)
-                  }
-                  placeholder="Enter your email"
-                  required
-                />
-
-              </div>
-
-              <div className="form-group">
-
-                <label>
-                  Password
-                </label>
-
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) =>
-                    setPassword(event.target.value)
-                  }
-                  placeholder="Enter your password"
-                  required
-                />
-
-              </div>
-
-              {authError && (
-                <div className="auth-error">
-                  {authError}
-                </div>
-              )}
-
-              {authMessage && (
-                <div className="auth-success">
-                  {authMessage}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="auth-submit"
-              >
-                {authMode === "login"
-                  ? "Login"
-                  : "Create Account"}
-              </button>
-
-            </form>
-
-            <div className="auth-switch">
-
-              {authMode === "login" ? (
-                <>
-                  Don't have an account?
-
-                  <button
-                    onClick={openRegister}
-                  >
-                    Register
-                  </button>
-                </>
-              ) : (
-                <>
-                  Already have an account?
-
-                  <button
-                    onClick={openLogin}
-                  >
-                    Login
-                  </button>
-                </>
-              )}
-
-            </div>
-
-          </div>
-
-        </div>
-
-      )}
-
-      {selectedContent && (
-
-        <div
-          className="auth-overlay"
-          onClick={closeReviewPanel}
-        >
-
-          <div
-            className="review-modal"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-
-            <button
-              className="close-button"
-              onClick={closeReviewPanel}
-            >
-              ×
-            </button>
-
-            <p className="section-label">
-              REVIEW
-            </p>
 
             <h2>
-              {selectedContent.title}
+              Welcome Back
             </h2>
 
-            <div className="rating-summary">
+            <p className="login-subtitle">
+              Login to rate movies and write reviews.
+            </p>
 
-              <strong>
-                {calculateAverageRating()}
-              </strong>
-
-              <span>
-                {ratings.length} rating
-                {ratings.length !== 1
-                  ? "s"
-                  : ""}
-              </span>
-
-            </div>
-
-            <div className="rating-form">
-
-              <h3>
-                Give your rating
-              </h3>
-
-              <div className="stars">
-
-                {[1, 2, 3, 4, 5].map(
-                  (star) => (
-
-                    <button
-                      key={star}
-                      type="button"
-                      className={
-                        star <= rating
-                          ? "star active"
-                          : "star"
-                      }
-                      onClick={() =>
-                        setRating(star)
-                      }
-                    >
-                      ★
-                    </button>
-
-                  )
-                )}
-
+            {loginError && (
+              <div className="login-error">
+                {loginError}
               </div>
-
-              <button
-                className="auth-submit"
-                onClick={submitRating}
-              >
-                Submit Rating
-              </button>
-
-            </div>
+            )}
 
             <form
-              className="review-form"
-              onSubmit={submitReview}
+              className="login-form"
+              onSubmit={handleLogin}
             >
 
-              <h3>
-                Write a review
-              </h3>
+              <label htmlFor="login-email">
+                Email
+              </label>
 
-              <textarea
-                value={reviewText}
+              <input
+                id="login-email"
+                type="email"
+                value={email}
                 onChange={(event) =>
-                  setReviewText(
-                    event.target.value
-                  )
+                  setEmail(event.target.value)
                 }
-                placeholder="Share your thoughts about this movie or webseries..."
-                maxLength={5000}
-                rows={5}
+                placeholder="Enter your email"
+                autoComplete="email"
+                disabled={loginLoading}
+              />
+
+              <label htmlFor="login-password">
+                Password
+              </label>
+
+              <input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={(event) =>
+                  setPassword(event.target.value)
+                }
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                disabled={loginLoading}
               />
 
               <button
                 type="submit"
-                className="auth-submit"
-                disabled={reviewLoading}
+                className="login-submit"
+                disabled={loginLoading}
               >
-                {reviewLoading
-                  ? "Submitting..."
-                  : "Submit Review"}
+                {loginLoading
+                  ? "Logging in..."
+                  : "Login"}
               </button>
 
             </form>
 
-            {reviewError && (
-              <div className="auth-error">
-                {reviewError}
+          </div>
+
+        </div>
+      )}
+
+
+      {/* MOVIE DETAILS MODAL */}
+
+      {selectedContent && (
+
+        <div
+          className="login-overlay"
+          onClick={(event) => {
+            if (
+              event.target === event.currentTarget
+            ) {
+              closeContent();
+            }
+          }}
+        >
+
+          <div
+            className="login-modal"
+            style={{
+              maxWidth: "850px",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
+
+            <button
+              className="login-close"
+              onClick={closeContent}
+            >
+              ×
+            </button>
+
+
+            {/* DETAILS HEADER */}
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "220px 1fr",
+                gap: "30px",
+                marginBottom: "30px",
+              }}
+            >
+
+              <div
+                style={{
+                  height: "320px",
+                  background: "#202028",
+                  borderRadius: "10px",
+                  overflow: "hidden",
+                }}
+              >
+
+                {selectedContent.poster_url ? (
+                  <img
+                    src={selectedContent.poster_url}
+                    alt={selectedContent.title}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    onError={(event) => {
+                      event.currentTarget.style.display =
+                        "none";
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="poster-placeholder"
+                    style={{
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {selectedContent.content_type}
+                  </div>
+                )}
+
               </div>
-            )}
 
-            {reviewMessage && (
-              <div className="auth-success">
-                {reviewMessage}
-              </div>
-            )}
 
-            <div className="existing-reviews">
+              <div>
 
-              <h3>
-                User Reviews
-              </h3>
+                <div className="login-brand">
+                  {selectedContent.content_type}
+                </div>
 
-              {reviews.length === 0 ? (
+                <h2>
+                  {selectedContent.title}
+                </h2>
 
-                <p className="no-reviews">
-                  No reviews yet. Be the first
-                  to review!
+                <p
+                  className="login-subtitle"
+                  style={{
+                    lineHeight: "1.7",
+                  }}
+                >
+                  {selectedContent.description ||
+                    "No description available."}
                 </p>
 
-              ) : (
-
-                reviews.map((review) => (
-
-                  <div
-                    className="review-item"
-                    key={review.id}
+                {selectedContent.release_date && (
+                  <p
+                    style={{
+                      color: "#888894",
+                      marginBottom: "10px",
+                    }}
                   >
+                    Release:{" "}
+                    {selectedContent.release_date}
+                  </p>
+                )}
 
-                    <div className="review-item-header">
+                {selectedContent.duration_minutes && (
+                  <p
+                    style={{
+                      color: "#888894",
+                    }}
+                  >
+                    Duration:{" "}
+                    {selectedContent.duration_minutes}
+                    {" "}minutes
+                  </p>
+                )}
 
-                      <strong>
-                        User #{review.user_id}
-                      </strong>
+                <div
+                  style={{
+                    marginTop: "25px",
+                    fontSize: "24px",
+                    fontWeight: "700",
+                    color: "#ffffff",
+                  }}
+                >
+                  ⭐ {calculateAverageRating()}
+                </div>
 
-                      <span>
-                        {review.status}
-                      </span>
+                <p
+                  style={{
+                    color: "#777783",
+                    marginTop: "6px",
+                    fontSize: "13px",
+                  }}
+                >
+                  {ratings.length} rating
+                  {ratings.length !== 1
+                    ? "s"
+                    : ""}
+                </p>
+
+              </div>
+
+            </div>
+
+
+            {/* DETAILS ERROR */}
+
+            {detailsError && (
+              <div className="login-error">
+                {detailsError}
+              </div>
+            )}
+
+
+            {detailsLoading ? (
+
+              <div
+                className="message"
+                style={{
+                  minHeight: "100px",
+                }}
+              >
+                Loading ratings and reviews...
+              </div>
+
+            ) : (
+
+              <>
+
+                {/* RATING */}
+
+                <div
+                  style={{
+                    borderTop:
+                      "1px solid #292932",
+                    paddingTop: "25px",
+                    marginBottom: "30px",
+                  }}
+                >
+
+                  <h3
+                    style={{
+                      color: "#ffffff",
+                      marginBottom: "15px",
+                    }}
+                  >
+                    Rate this title
+                  </h3>
+
+                  {!user ? (
+
+                    <button
+                      className="login-submit"
+                      onClick={() => {
+                        closeContent();
+                        openLogin();
+                      }}
+                    >
+                      Login to Rate
+                    </button>
+
+                  ) : (
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "12px",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+
+                      <select
+                        value={selectedRating}
+                        onChange={(event) =>
+                          setSelectedRating(
+                            event.target.value
+                          )
+                        }
+                        style={{
+                          padding: "12px",
+                          borderRadius: "8px",
+                          border:
+                            "1px solid #34343e",
+                          background: "#0e0e13",
+                          color: "#ffffff",
+                        }}
+                      >
+                        <option value="5">
+                          5 ⭐
+                        </option>
+
+                        <option value="4">
+                          4 ⭐
+                        </option>
+
+                        <option value="3">
+                          3 ⭐
+                        </option>
+
+                        <option value="2">
+                          2 ⭐
+                        </option>
+
+                        <option value="1">
+                          1 ⭐
+                        </option>
+                      </select>
+
+                      <button
+                        className="login-submit"
+                        style={{
+                          width: "auto",
+                          padding:
+                            "12px 22px",
+                        }}
+                        onClick={submitRating}
+                        disabled={ratingLoading}
+                      >
+                        {ratingLoading
+                          ? "Submitting..."
+                          : "Submit Rating"}
+                      </button>
 
                     </div>
 
-                    <p>
-                      {review.review_text}
+                  )}
+
+                </div>
+
+
+                {/* REVIEW FORM */}
+
+                <div
+                  style={{
+                    borderTop:
+                      "1px solid #292932",
+                    paddingTop: "25px",
+                    marginBottom: "30px",
+                  }}
+                >
+
+                  <h3
+                    style={{
+                      color: "#ffffff",
+                      marginBottom: "15px",
+                    }}
+                  >
+                    Write a Review
+                  </h3>
+
+                  {!user ? (
+
+                    <button
+                      className="login-submit"
+                      onClick={() => {
+                        closeContent();
+                        openLogin();
+                      }}
+                    >
+                      Login to Write a Review
+                    </button>
+
+                  ) : (
+
+                    <form
+                      onSubmit={submitReview}
+                    >
+
+                      <textarea
+                        value={reviewText}
+                        onChange={(event) =>
+                          setReviewText(
+                            event.target.value
+                          )
+                        }
+                        placeholder="Share your thoughts about this movie or webseries..."
+                        maxLength={5000}
+                        rows={5}
+                        style={{
+                          width: "100%",
+                          resize: "vertical",
+                          padding: "14px",
+                          borderRadius: "8px",
+                          border:
+                            "1px solid #34343e",
+                          background: "#0e0e13",
+                          color: "#ffffff",
+                          outline: "none",
+                          fontSize: "14px",
+                          lineHeight: "1.6",
+                          marginBottom: "12px",
+                        }}
+                      />
+
+                      <button
+                        type="submit"
+                        className="login-submit"
+                        disabled={reviewLoading}
+                      >
+                        {reviewLoading
+                          ? "Submitting..."
+                          : "Submit Review"}
+                      </button>
+
+                    </form>
+
+                  )}
+
+                </div>
+
+
+                {/* REVIEWS */}
+
+                <div
+                  style={{
+                    borderTop:
+                      "1px solid #292932",
+                    paddingTop: "25px",
+                  }}
+                >
+
+                  <h3
+                    style={{
+                      color: "#ffffff",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    Reviews
+                  </h3>
+
+                  {reviews.length === 0 ? (
+
+                    <p
+                      style={{
+                        color: "#777783",
+                      }}
+                    >
+                      No reviews yet. Be the first
+                      to review this title.
                     </p>
 
-                  </div>
+                  ) : (
 
-                ))
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "15px",
+                      }}
+                    >
 
-              )}
+                      {reviews.map((review) => (
 
-            </div>
+                        <div
+                          key={review.id}
+                          style={{
+                            padding: "18px",
+                            background: "#0e0e13",
+                            border:
+                              "1px solid #292932",
+                            borderRadius: "10px",
+                          }}
+                        >
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent:
+                                "space-between",
+                              marginBottom: "10px",
+                              gap: "10px",
+                            }}
+                          >
+
+                            <strong
+                              style={{
+                                color: "#ffffff",
+                              }}
+                            >
+                              User #{review.user_id}
+                            </strong>
+
+                            <span
+                              style={{
+                                color: "#666672",
+                                fontSize: "12px",
+                              }}
+                            >
+                              {review.created_at
+                                ? new Date(
+                                    review.created_at
+                                  ).toLocaleDateString()
+                                : ""}
+                            </span>
+
+                          </div>
+
+                          <p
+                            style={{
+                              color: "#a1a1ad",
+                              lineHeight: "1.6",
+                            }}
+                          >
+                            {review.review_text}
+                          </p>
+
+                        </div>
+
+                      ))}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              </>
+
+            )}
 
           </div>
 
         </div>
-
       )}
 
     </div>
