@@ -7,11 +7,21 @@ function App() {
   const [error, setError] = useState("");
 
   const [showLogin, setShowLogin] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+
   const [loginLoading, setLoginLoading] = useState(false);
+  const [signupLoading, setSignupLoading] = useState(false);
+
   const [loginError, setLoginError] = useState("");
+  const [signupError, setSignupError] = useState("");
+
   const [user, setUser] = useState(null);
 
   const [selectedContent, setSelectedContent] = useState(null);
@@ -52,7 +62,6 @@ function App() {
       setContents(response.data);
     } catch (err) {
       console.error("Content loading error:", err);
-
       setError("Unable to load movies and webseries.");
     } finally {
       setLoading(false);
@@ -73,6 +82,8 @@ function App() {
     setLoginError("");
     setEmail("");
     setPassword("");
+
+    setShowSignup(false);
     setShowLogin(true);
   }
 
@@ -80,6 +91,23 @@ function App() {
     if (!loginLoading) {
       setShowLogin(false);
       setLoginError("");
+    }
+  }
+
+  function openSignup() {
+    setSignupError("");
+    setSignupName("");
+    setSignupEmail("");
+    setSignupPassword("");
+
+    setShowLogin(false);
+    setShowSignup(true);
+  }
+
+  function closeSignup() {
+    if (!signupLoading) {
+      setShowSignup(false);
+      setSignupError("");
     }
   }
 
@@ -111,8 +139,8 @@ function App() {
       }
 
       const loggedInUser = {
+        ...(data.user || {}),
         email: email.trim(),
-        ...data,
       };
 
       localStorage.setItem(
@@ -144,6 +172,86 @@ function App() {
       }
     } finally {
       setLoginLoading(false);
+    }
+  }
+
+  async function handleSignup(event) {
+    event.preventDefault();
+
+    setSignupError("");
+
+    if (!signupName.trim()) {
+      setSignupError("Please enter your name.");
+      return;
+    }
+
+    if (!signupEmail.trim()) {
+      setSignupError("Please enter your email.");
+      return;
+    }
+
+    if (signupPassword.length < 8) {
+      setSignupError(
+        "Password must contain at least 8 characters."
+      );
+      return;
+    }
+
+    if (signupPassword.length > 72) {
+      setSignupError(
+        "Password cannot contain more than 72 characters."
+      );
+      return;
+    }
+
+    try {
+      setSignupLoading(true);
+
+      await api.post("/api/auth/register", {
+        name: signupName.trim(),
+        email: signupEmail.trim(),
+        password: signupPassword,
+      });
+
+      setShowSignup(false);
+
+      setSignupName("");
+      setSignupEmail("");
+      setSignupPassword("");
+      setSignupError("");
+
+      setEmail(signupEmail.trim());
+
+      setShowLogin(true);
+
+      alert(
+        "Account created successfully! Please login."
+      );
+    } catch (err) {
+      console.error("Signup error:", err);
+
+      if (err.response) {
+        if (err.response.status === 400) {
+          setSignupError(
+            err.response.data?.detail ||
+              "Email already registered."
+          );
+        } else if (err.response.data?.detail) {
+          setSignupError(
+            err.response.data.detail
+          );
+        } else {
+          setSignupError(
+            "Registration failed. Please try again."
+          );
+        }
+      } else {
+        setSignupError(
+          "Unable to connect to the server."
+        );
+      }
+    } finally {
+      setSignupLoading(false);
     }
   }
 
@@ -239,7 +347,8 @@ function App() {
 
       setRatings((current) => {
         const existing = current.find(
-          (item) => item.user_id === response.data.user_id
+          (item) =>
+            item.user_id === response.data.user_id
         );
 
         if (existing) {
@@ -338,11 +447,13 @@ function App() {
       {/* NAVBAR */}
 
       <header className="navbar">
+
         <div className="logo">
           CineScope
         </div>
 
         <nav>
+
           <a href="#home">
             Home
           </a>
@@ -363,7 +474,7 @@ function App() {
                   fontSize: "14px",
                 }}
               >
-                {user.email}
+                {user.name || user.email}
               </span>
 
               <button
@@ -374,14 +485,25 @@ function App() {
               </button>
             </>
           ) : (
-            <button
-              className="login-button"
-              onClick={openLogin}
-            >
-              Login
-            </button>
+            <>
+              <button
+                className="login-button"
+                onClick={openLogin}
+              >
+                Login
+              </button>
+
+              <button
+                className="login-button"
+                onClick={openSignup}
+              >
+                Sign Up
+              </button>
+            </>
           )}
+
         </nav>
+
       </header>
 
 
@@ -395,6 +517,7 @@ function App() {
           className="hero"
           id="home"
         >
+
           <div className="hero-content">
 
             <p className="hero-label">
@@ -421,6 +544,7 @@ function App() {
             </button>
 
           </div>
+
         </section>
 
 
@@ -434,6 +558,7 @@ function App() {
           <div className="section-heading">
 
             <div>
+
               <p className="section-label">
                 EXPLORE
               </p>
@@ -441,6 +566,7 @@ function App() {
               <h2>
                 Movies & Webseries
               </h2>
+
             </div>
 
             <span>
@@ -450,8 +576,6 @@ function App() {
           </div>
 
 
-          {/* LOADING */}
-
           {loading && (
             <div className="message">
               Loading content...
@@ -459,10 +583,9 @@ function App() {
           )}
 
 
-          {/* ERROR */}
-
           {!loading && error && (
             <div className="message error">
+
               {error}
 
               <button
@@ -471,11 +594,10 @@ function App() {
               >
                 Retry
               </button>
+
             </div>
           )}
 
-
-          {/* EMPTY */}
 
           {!loading &&
             !error &&
@@ -485,8 +607,6 @@ function App() {
               </div>
             )}
 
-
-          {/* CONTENT CARDS */}
 
           {!loading &&
             !error &&
@@ -554,7 +674,8 @@ function App() {
                       {content.duration_minutes && (
                         <span className="release-date">
                           Duration:{" "}
-                          {content.duration_minutes} minutes
+                          {content.duration_minutes}
+                          {" "}minutes
                         </span>
                       )}
 
@@ -576,6 +697,7 @@ function App() {
                 ))}
 
               </div>
+
             )}
 
         </section>
@@ -586,10 +708,12 @@ function App() {
       {/* FOOTER */}
 
       <footer>
+
         <p>
           © 2026 CineScope — Movies & Webseries
           Review Platform
         </p>
+
       </footer>
 
 
@@ -600,11 +724,13 @@ function App() {
         <div
           className="login-overlay"
           onClick={(event) => {
+
             if (
               event.target === event.currentTarget
             ) {
               closeLogin();
             }
+
           }}
         >
 
@@ -626,9 +752,10 @@ function App() {
               Welcome Back
             </h2>
 
-            <p className="login-subtitle">
+            <p className="login-description">
               Login to rate movies and write reviews.
             </p>
+
 
             {loginError && (
               <div className="login-error">
@@ -636,42 +763,53 @@ function App() {
               </div>
             )}
 
+
             <form
               className="login-form"
               onSubmit={handleLogin}
             >
 
-              <label htmlFor="login-email">
-                Email
-              </label>
+              <div className="login-field">
 
-              <input
-                id="login-email"
-                type="email"
-                value={email}
-                onChange={(event) =>
-                  setEmail(event.target.value)
-                }
-                placeholder="Enter your email"
-                autoComplete="email"
-                disabled={loginLoading}
-              />
+                <label htmlFor="login-email">
+                  Email
+                </label>
 
-              <label htmlFor="login-password">
-                Password
-              </label>
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  disabled={loginLoading}
+                />
 
-              <input
-                id="login-password"
-                type="password"
-                value={password}
-                onChange={(event) =>
-                  setPassword(event.target.value)
-                }
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                disabled={loginLoading}
-              />
+              </div>
+
+
+              <div className="login-field">
+
+                <label htmlFor="login-password">
+                  Password
+                </label>
+
+                <input
+                  id="login-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  disabled={loginLoading}
+                />
+
+              </div>
+
 
               <button
                 type="submit"
@@ -685,9 +823,205 @@ function App() {
 
             </form>
 
+
+            <p
+              style={{
+                textAlign: "center",
+                color: "#777783",
+                marginTop: "20px",
+                fontSize: "14px",
+              }}
+            >
+              Don't have an account?{" "}
+
+              <button
+                type="button"
+                onClick={openSignup}
+                style={{
+                  border: "none",
+                  background: "none",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                  padding: 0,
+                }}
+              >
+                Sign Up
+              </button>
+
+            </p>
+
           </div>
 
         </div>
+
+      )}
+
+
+      {/* SIGNUP MODAL */}
+
+      {showSignup && (
+
+        <div
+          className="login-overlay"
+          onClick={(event) => {
+
+            if (
+              event.target === event.currentTarget
+            ) {
+              closeSignup();
+            }
+
+          }}
+        >
+
+          <div className="login-modal">
+
+            <button
+              className="login-close"
+              onClick={closeSignup}
+              disabled={signupLoading}
+            >
+              ×
+            </button>
+
+
+            <div className="login-brand">
+              CINESCOPE
+            </div>
+
+
+            <h2>
+              Create Account
+            </h2>
+
+            <p className="login-description">
+              Join CineScope and start rating and
+              reviewing your favorite content.
+            </p>
+
+
+            {signupError && (
+              <div className="login-error">
+                {signupError}
+              </div>
+            )}
+
+
+            <form
+              className="login-form"
+              onSubmit={handleSignup}
+            >
+
+              <div className="login-field">
+
+                <label htmlFor="signup-name">
+                  Name
+                </label>
+
+                <input
+                  id="signup-name"
+                  type="text"
+                  value={signupName}
+                  onChange={(event) =>
+                    setSignupName(event.target.value)
+                  }
+                  placeholder="Enter your name"
+                  autoComplete="name"
+                  disabled={signupLoading}
+                />
+
+              </div>
+
+
+              <div className="login-field">
+
+                <label htmlFor="signup-email">
+                  Email
+                </label>
+
+                <input
+                  id="signup-email"
+                  type="email"
+                  value={signupEmail}
+                  onChange={(event) =>
+                    setSignupEmail(event.target.value)
+                  }
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  disabled={signupLoading}
+                />
+
+              </div>
+
+
+              <div className="login-field">
+
+                <label htmlFor="signup-password">
+                  Password
+                </label>
+
+                <input
+                  id="signup-password"
+                  type="password"
+                  value={signupPassword}
+                  onChange={(event) =>
+                    setSignupPassword(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Minimum 8 characters"
+                  autoComplete="new-password"
+                  disabled={signupLoading}
+                />
+
+              </div>
+
+
+              <button
+                type="submit"
+                className="login-submit"
+                disabled={signupLoading}
+              >
+                {signupLoading
+                  ? "Creating account..."
+                  : "Create Account"}
+              </button>
+
+            </form>
+
+
+            <p
+              style={{
+                textAlign: "center",
+                color: "#777783",
+                marginTop: "20px",
+                fontSize: "14px",
+              }}
+            >
+              Already have an account?{" "}
+
+              <button
+                type="button"
+                onClick={openLogin}
+                style={{
+                  border: "none",
+                  background: "none",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                  padding: 0,
+                }}
+              >
+                Login
+              </button>
+
+            </p>
+
+          </div>
+
+        </div>
+
       )}
 
 
@@ -698,11 +1032,13 @@ function App() {
         <div
           className="login-overlay"
           onClick={(event) => {
+
             if (
               event.target === event.currentTarget
             ) {
               closeContent();
             }
+
           }}
         >
 
@@ -722,8 +1058,6 @@ function App() {
               ×
             </button>
 
-
-            {/* DETAILS HEADER */}
 
             <div
               style={{
@@ -745,6 +1079,7 @@ function App() {
               >
 
                 {selectedContent.poster_url ? (
+
                   <img
                     src={selectedContent.poster_url}
                     alt={selectedContent.title}
@@ -758,7 +1093,9 @@ function App() {
                         "none";
                     }}
                   />
+
                 ) : (
+
                   <div
                     className="poster-placeholder"
                     style={{
@@ -770,6 +1107,7 @@ function App() {
                   >
                     {selectedContent.content_type}
                   </div>
+
                 )}
 
               </div>
@@ -786,7 +1124,7 @@ function App() {
                 </h2>
 
                 <p
-                  className="login-subtitle"
+                  className="login-description"
                   style={{
                     lineHeight: "1.7",
                   }}
@@ -847,8 +1185,6 @@ function App() {
 
             </div>
 
-
-            {/* DETAILS ERROR */}
 
             {detailsError && (
               <div className="login-error">
@@ -931,6 +1267,7 @@ function App() {
                           color: "#ffffff",
                         }}
                       >
+
                         <option value="5">
                           5 ⭐
                         </option>
@@ -950,6 +1287,7 @@ function App() {
                         <option value="1">
                           1 ⭐
                         </option>
+
                       </select>
 
                       <button
@@ -974,7 +1312,7 @@ function App() {
                 </div>
 
 
-                {/* REVIEW FORM */}
+                {/* REVIEW */}
 
                 <div
                   style={{
@@ -1035,6 +1373,8 @@ function App() {
                           fontSize: "14px",
                           lineHeight: "1.6",
                           marginBottom: "12px",
+                          boxSizing:
+                            "border-box",
                         }}
                       />
 
@@ -1090,7 +1430,8 @@ function App() {
                     <div
                       style={{
                         display: "flex",
-                        flexDirection: "column",
+                        flexDirection:
+                          "column",
                         gap: "15px",
                       }}
                     >
@@ -1104,7 +1445,8 @@ function App() {
                             background: "#0e0e13",
                             border:
                               "1px solid #292932",
-                            borderRadius: "10px",
+                            borderRadius:
+                              "10px",
                           }}
                         >
 
@@ -1113,7 +1455,8 @@ function App() {
                               display: "flex",
                               justifyContent:
                                 "space-between",
-                              marginBottom: "10px",
+                              marginBottom:
+                                "10px",
                               gap: "10px",
                             }}
                           >
@@ -1129,7 +1472,8 @@ function App() {
                             <span
                               style={{
                                 color: "#666672",
-                                fontSize: "12px",
+                                fontSize:
+                                  "12px",
                               }}
                             >
                               {review.created_at
@@ -1144,7 +1488,8 @@ function App() {
                           <p
                             style={{
                               color: "#a1a1ad",
-                              lineHeight: "1.6",
+                              lineHeight:
+                                "1.6",
                             }}
                           >
                             {review.review_text}
@@ -1167,6 +1512,7 @@ function App() {
           </div>
 
         </div>
+
       )}
 
     </div>
