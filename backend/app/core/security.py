@@ -4,19 +4,6 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from jose import jwt
 from passlib.context import CryptContext
-from jose import JWTError
-
-
-def decode_access_token(token: str):
-    try:
-        payload = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
-        )
-        return payload
-    except JWTError:
-        return None
 
 load_dotenv()
 
@@ -41,6 +28,9 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def create_access_token(user_id: int, role: str) -> str:
+    if not SECRET_KEY:
+        raise RuntimeError("JWT_SECRET_KEY is not configured")
+
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
@@ -56,3 +46,15 @@ def create_access_token(user_id: int, role: str) -> str:
         SECRET_KEY,
         algorithm=ALGORITHM
     )
+
+
+def decode_access_token(token: str):
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+        return payload
+    except Exception:
+        return None
